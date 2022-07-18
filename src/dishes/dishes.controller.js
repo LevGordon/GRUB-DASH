@@ -7,98 +7,113 @@ const dishes = require(path.resolve("src/data/dishes-data"));
 const nextId = require("../utils/nextId");
 
 // TODO: Implement the /dishes handlers needed to make the tests pass
+function list(req, res, next) {
+  res.json({ data: dishes });
+}
 
-//middleware to check if the dish has a name
-//needed in order to move onto 'create()' and 'update()'
-function bodyHasName(req, res, next) {
-    const { data: { name } = {} } = req.body
-    if (name) {
-        res.locals.name = name
-        return next()
-    }else{ 
-        next({
-            status: 400, message: `A 'name' property is required.`,})
+function bodyDataHas(propertyName) {
+  return function (req, res, next) {
+    const { data = {} } = req.body;
+    if (data[propertyName] && data["price"] > 0) {
+      return next();
     }
-}
-
-//middleware to check if dish has description
-//needed in order to move onto 'create()' and 'update()'
-function bodyHasDescription(req, res, next) {
-    const { data: { description } = {} } = req.body
-    if(description) {
-        res.locals.description = description
-        return next() 
-    }else {
-        next({status: 400, message: `A 'description' property is required.`,}) 
+    if (data["price"] < 1 || !data["price"]) {
+      next({ status: 400, message: `Dish must include a price` });
     }
+    next({ status: 400, message: `Dish must include a ${propertyName}` });
+  };
 }
 
-//middleware to check if dish has a price
-//needed in order to move onto 'create()' and 'update()'
-function bodyHasPrice(req, res, next) {
-    const { data: { price } = {} } = req.body
-    if (price) {
-        res.locals.price = price
-        return next() 
-    }else {
-        next({status: 400, message: `A 'price' property is required.`,})
-    };
+function idMatches(req, res, next) {
+  const { dishId } = req.params;
+  const {
+    data: { id },
+  } = req.body;
+  if (Number(id) === Number(dishId) || !id) {
+    return next();
+  }
+  next({
+    status: 400,
+    message: `Updated dish id must match current dish's id - id given: ${id} - correct id: ${dishId}`,
+  });
 }
 
-//middleware to check if dish price provided is valid
-//needed to move onto 'create'
-function bodyHasValidPrice(req, res, next) {
-    const { data: { price } = {} } = req.body
-    if (price > -1) {
-        res.locals.price = price
-        return next() 
-    }else {
-        next({status: 400, message: `price cannot be less than 0`,})
-    } 
+function isNumber(req, res, next) {
+  const dish = res.locals.dish;
+  if (typeof dish.price !== "string") {
+    return next();
+  }
+  next({
+    status: 400,
+    message: `Updated dish price must be a number`,
+  });
 }
 
-//middleware to check if dish price is valid for 'update()'
-//needed to move onto 'update'
-function bodyHasValidPriceforUpdate(req, res, next) {
-    const { data: { price } = {} } = req.body
-    if (res.locals.price <= 0 || typeof res.locals.price !== "number") {
-        next({status: 400, message: `price must be an integer greater than $0`,})
-    } else {
-        return next()
-    }
+function create(req, res, next) {
+  const {
+    data: { name, description, price, image_url },
+  } = req.body;
+  const newDishId = dishes.length + 1;
+  const newDish = {
+    id: newDishId,
+    name,
+    description,
+    price,
+    image_url,
+  };
+  dishes.push(newDish);
+  res.status(201).json({ data: newDish });
 }
 
-//middleware to check if dish has an image property
-//needed to move onto 'create() and 'update()'
-function bodyHasImg(req, res, next) {
-    const { data: { image_url } = {} } = req.body
-    if (image_url) {
-        res.locals.image_url = image_url
-        return next()
-    } else {
-        next ({status: 400, message: `An 'image_url' property is required.`,})
-    }
-}
-
-//middleware to check if the dish exists 
-//dish id is needed in order to move onto 
-//'read()' and 'update()'
 function dishExists(req, res, next) {
-    const matchingDish = dishes.find((dish) => dish.id === dishId)
-    if (matchingDish) {
-        res.locals.matchingDish = matchingDish
-        return next()
-    }
-    next ({status: 400, message: `Dish id not found: ${dishId}`,})
+  const { dishId } = req.params;
+  const foundDish = dishes.find((dish) => dish.id == dishId);
+  if (foundDish) {
+    res.locals.dish = foundDish;
+    return next();
+  }
+  next({
+    status: 404,
+    message: `Dish id not found: ${dishId}`,
+  });
 }
 
-//middleware for checking if the data id matches it's parameters id
-// in order to move onto the 'update' handler
+function read(req, res) {
+  res.json({ data: res.locals.dish });
+}
 
- 
+function update(req, res, next) {
+  const dish = res.locals.dish;
+  const { dishId } = req.params;
+  const {
+    data: { id, name, description, price, image_url },
+  } = req.body;
+
+  dish.name = name;
+  dish.description = description;
+  dish.price = price;
+  dish.image_url = image_url;
+  res.json({ data: dish });
+}
 
 module.exports = {
-    bodyHasName,
-    bodyHasDescription,
-    bodyHasPrice,
+  list,
+  create: [
+    bodyDataHas("name"),
+    bodyDataHas("description"),
+    bodyDataHas("price"),
+    bodyDataHas("image_url"),
+    create,
+  ],
+  read: [dishExists, read],
+  update: [
+    dishExists,
+    idMatches,
+    bodyDataHas("name"),
+    bodyDataHas("description"),
+    bodyDataHas("price"),
+    bodyDataHas("image_url"),
+    isNumber,
+    update,
+  ],
 };
