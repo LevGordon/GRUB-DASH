@@ -50,9 +50,7 @@ function isNumber(req, res, next) {
 }
 
 function create(req, res, next) {
-  const {
-    data: { name, description, price, image_url },
-  } = req.body;
+  const {  data: { name, description, price, image_url }} = req.body;
   const newDishId = dishes.length + 1;
   const newDish = {
     id: newDishId,
@@ -85,9 +83,7 @@ function read(req, res) {
 function update(req, res, next) {
   const dish = res.locals.dish;
   const { dishId } = req.params;
-  const {
-    data: { id, name, description, price, image_url },
-  } = req.body;
+  const {    data: { id, name, description, price, image_url }} = req.body;
 
   dish.name = name;
   dish.description = description;
